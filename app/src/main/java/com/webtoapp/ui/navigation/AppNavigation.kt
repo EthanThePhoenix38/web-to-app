@@ -1,11 +1,22 @@
 package com.webtoapp.ui.navigation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.*
+import androidx.compose.runtime.State
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.pointer.pointerInput
@@ -15,8 +26,13 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -27,9 +43,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +61,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.webtoapp.core.i18n.Strings
+import com.webtoapp.ui.components.themedBackground
 import com.webtoapp.ui.screens.community.CommunityScreen
 import com.webtoapp.ui.screens.AiSettingsScreen
 import com.webtoapp.ui.screens.AppModifierScreen
@@ -67,7 +87,7 @@ import com.webtoapp.ui.screens.AboutScreen
 import com.webtoapp.ui.screens.StatsScreen
 import com.webtoapp.ui.screens.AiHtmlCodingScreen
 import com.webtoapp.ui.screens.AiCodingScreen
-import com.webtoapp.ui.screens.ThemeSettingsScreen
+
 import com.webtoapp.ui.screens.ExtensionModuleScreen
 import com.webtoapp.ui.screens.ModuleEditorScreen
 import com.webtoapp.ui.screens.AuthScreen
@@ -158,7 +178,7 @@ object Routes {
     const val AI_SETTINGS = "ai_settings"
     const val AI_CODING = "ai_coding"
     const val AI_HTML_CODING = "ai_html_coding"
-    const val THEME_SETTINGS = "theme_settings"
+
     const val BROWSER_KERNEL = "browser_kernel"
     const val HOSTS_ADBLOCK = "hosts_adblock"
     const val EXTENSION_MODULES = "extension_modules"
@@ -215,11 +235,165 @@ fun AppNavigation() {
 
     // Track the selected tab persistently
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var previousTab by remember { mutableIntStateOf(0) }
 
     // Track whether we're on a detail screen (pushed from a tab)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val isOnDetailScreen = currentRoute != null && currentRoute != "tab_host"
+
+    // ═══════ 自动检查更新 ═══════
+    val context = LocalContext.current
+    var autoUpdateInfo by remember { mutableStateOf<com.webtoapp.util.AppUpdateChecker.UpdateInfo?>(null) }
+    var showAutoUpdateDialog by remember { mutableStateOf(false) }
+    var isAutoDownloading by remember { mutableStateOf(false) }
+    var autoDownloadId by remember { mutableStateOf(-1L) }
+
+    // 启动时自动检查更新（仅执行一次）
+    LaunchedEffect(Unit) {
+        if (com.webtoapp.util.AppUpdateChecker.shouldAutoCheck(context)) {
+            try {
+                val (versionName, versionCode) = com.webtoapp.util.AppUpdateChecker.getCurrentVersionInfo(context)
+                com.webtoapp.util.AppUpdateChecker.recordAutoCheck(context)
+                val result = com.webtoapp.util.AppUpdateChecker.checkUpdate(versionName, versionCode)
+                result.onSuccess { info ->
+                    if (info.hasUpdate) {
+                        autoUpdateInfo = info
+                        showAutoUpdateDialog = true
+                    }
+                }
+            } catch (_: Exception) {
+                // 静默失败，不打扰用户
+            }
+        }
+    }
+
+    // 监听下载完成
+    androidx.compose.runtime.DisposableEffect(autoDownloadId) {
+        if (autoDownloadId == -1L) return@DisposableEffect onDispose {}
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
+                val id = intent?.getLongExtra(android.app.DownloadManager.EXTRA_DOWNLOAD_ID, -1) ?: -1
+                if (id == autoDownloadId) {
+                    isAutoDownloading = false
+                    com.webtoapp.util.AppUpdateChecker.installApk(context, autoDownloadId)
+                }
+            }
+        }
+        androidx.core.content.ContextCompat.registerReceiver(
+            context,
+            receiver,
+            android.content.IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        onDispose {
+            try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
+        }
+    }
+
+    // 自动更新提示对话框
+    if (showAutoUpdateDialog && autoUpdateInfo != null) {
+        val info = autoUpdateInfo!!
+        val (curVersion, _) = remember { com.webtoapp.util.AppUpdateChecker.getCurrentVersionInfo(context) }
+        AlertDialog(
+            onDismissRequest = { showAutoUpdateDialog = false },
+            icon = {
+                Icon(
+                    Icons.Outlined.SystemUpdate,
+                    null,
+                    tint = Color(0xFF2196F3),
+                    modifier = Modifier.size(48.dp)
+                )
+            },
+            title = {
+                Text(
+                    Strings.newVersionFound,
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                "v$curVersion",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        Text("→")
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF2196F3).copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                info.versionName,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF2196F3)
+                            )
+                        }
+                    }
+                    if (info.releaseNotes.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            info.releaseNotes,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (info.downloadUrl.isNotEmpty()) {
+                            isAutoDownloading = true
+                            autoDownloadId = com.webtoapp.util.AppUpdateChecker.downloadApk(
+                                context,
+                                info.downloadUrl,
+                                info.versionName
+                            )
+                            if (autoDownloadId == -1L) {
+                                isAutoDownloading = false
+                            }
+                            showAutoUpdateDialog = false
+                        }
+                    },
+                    enabled = !isAutoDownloading
+                ) {
+                    if (isAutoDownloading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(Strings.updateNow)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showAutoUpdateDialog = false }
+                ) {
+                    Text(Strings.updateLater)
+                }
+            }
+        )
+    }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -242,6 +416,7 @@ fun AppNavigation() {
                         if (isOnDetailScreen) {
                             navController.popBackStack("tab_host", inclusive = false)
                         }
+                        previousTab = selectedTab
                         selectedTab = index
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -253,19 +428,35 @@ fun AppNavigation() {
     androidx.compose.foundation.layout.Box(
         modifier = Modifier
             .fillMaxSize()
+            .themedBackground()
             .padding(bottom = if (!isOnDetailScreen) scaffoldPadding.calculateBottomPadding() else 0.dp)
     ) {
         // ════════════════════════════════════════════
         // Persistent Tab Content — all tabs stay alive
         // ════════════════════════════════════════════
 
+        // 滑动方向：目标 tab 在右侧则从右往左滑入
+        val slideDirection = if (selectedTab >= previousTab) 1 else -1
+        val slideOffsetPx = 120f  // 偏移量（像素）
+        
         // Tab 0: 首页
         val tab0Active = selectedTab == 0 && !isOnDetailScreen
+        val tab0Alpha by animateFloatAsState(
+            targetValue = if (tab0Active) 1f else 0f,
+            animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium), label = "tab0Alpha"
+        )
+        val tab0OffsetX by animateFloatAsState(
+            targetValue = if (tab0Active) 0f else (if (0 < selectedTab) -slideOffsetPx else slideOffsetPx),
+            animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow), label = "tab0Offset"
+        )
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .fillMaxSize()
                 .zIndex(if (tab0Active) 1f else 0f)
-                .graphicsLayer { alpha = if (tab0Active) 1f else 0f }
+                .graphicsLayer {
+                    alpha = tab0Alpha
+                    translationX = tab0OffsetX * density
+                }
         ) {
             HomeScreen(
                 viewModel = viewModel,
@@ -319,11 +510,22 @@ fun AppNavigation() {
 
         // Tab 1: 市场
         val tab1Active = selectedTab == 1 && !isOnDetailScreen
+        val tab1Alpha by animateFloatAsState(
+            targetValue = if (tab1Active) 1f else 0f,
+            animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium), label = "tab1Alpha"
+        )
+        val tab1OffsetX by animateFloatAsState(
+            targetValue = if (tab1Active) 0f else (if (1 < selectedTab) -slideOffsetPx else slideOffsetPx),
+            animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow), label = "tab1Offset"
+        )
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .fillMaxSize()
                 .zIndex(if (tab1Active) 1f else 0f)
-                .graphicsLayer { alpha = if (tab1Active) 1f else 0f }
+                .graphicsLayer {
+                    alpha = tab1Alpha
+                    translationX = tab1OffsetX * density
+                }
         ) {
             val cloudViewModel: CloudViewModel = org.koin.androidx.compose.koinViewModel()
             val context = LocalContext.current
@@ -343,11 +545,22 @@ fun AppNavigation() {
 
         // Tab 2: 社区
         val tab2Active = selectedTab == 2 && !isOnDetailScreen
+        val tab2Alpha by animateFloatAsState(
+            targetValue = if (tab2Active) 1f else 0f,
+            animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium), label = "tab2Alpha"
+        )
+        val tab2OffsetX by animateFloatAsState(
+            targetValue = if (tab2Active) 0f else (if (2 < selectedTab) -slideOffsetPx else slideOffsetPx),
+            animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow), label = "tab2Offset"
+        )
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .fillMaxSize()
                 .zIndex(if (tab2Active) 1f else 0f)
-                .graphicsLayer { alpha = if (tab2Active) 1f else 0f }
+                .graphicsLayer {
+                    alpha = tab2Alpha
+                    translationX = tab2OffsetX * density
+                }
         ) {
             CommunityScreen(
                 onNavigateToUser = { userId -> navController.navigate(Routes.communityUser(userId)) },
@@ -361,11 +574,22 @@ fun AppNavigation() {
 
         // Tab 3: 我的
         val tab3Active = selectedTab == 3 && !isOnDetailScreen
+        val tab3Alpha by animateFloatAsState(
+            targetValue = if (tab3Active) 1f else 0f,
+            animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium), label = "tab3Alpha"
+        )
+        val tab3OffsetX by animateFloatAsState(
+            targetValue = if (tab3Active) 0f else (if (3 < selectedTab) -slideOffsetPx else slideOffsetPx),
+            animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow), label = "tab3Offset"
+        )
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .fillMaxSize()
                 .zIndex(if (tab3Active) 1f else 0f)
-                .graphicsLayer { alpha = if (tab3Active) 1f else 0f }
+                .graphicsLayer {
+                    alpha = tab3Alpha
+                    translationX = tab3OffsetX * density
+                }
         ) {
             val authState by authViewModel.authState.collectAsStateWithLifecycle()
             when (authState) {
@@ -392,16 +616,27 @@ fun AppNavigation() {
 
         // Tab 4: 更多
         val tab4Active = selectedTab == 4 && !isOnDetailScreen
+        val tab4Alpha by animateFloatAsState(
+            targetValue = if (tab4Active) 1f else 0f,
+            animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium), label = "tab4Alpha"
+        )
+        val tab4OffsetX by animateFloatAsState(
+            targetValue = if (tab4Active) 0f else (if (4 < selectedTab) -slideOffsetPx else slideOffsetPx),
+            animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow), label = "tab4Offset"
+        )
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .fillMaxSize()
                 .zIndex(if (tab4Active) 1f else 0f)
-                .graphicsLayer { alpha = if (tab4Active) 1f else 0f }
+                .graphicsLayer {
+                    alpha = tab4Alpha
+                    translationX = tab4OffsetX * density
+                }
         ) {
             MoreScreen(
                 onOpenAiCoding = { navController.navigate(Routes.AI_CODING) },
                 onOpenAiSettings = { navController.navigate(Routes.AI_SETTINGS) },
-                onOpenThemeSettings = { navController.navigate(Routes.THEME_SETTINGS) },
+
                 onOpenBrowserKernel = { navController.navigate(Routes.BROWSER_KERNEL) },
                 onOpenHostsAdBlock = { navController.navigate(Routes.HOSTS_ADBLOCK) },
                 onOpenAppModifier = { navController.navigate(Routes.APP_MODIFIER) },
@@ -420,7 +655,32 @@ fun AppNavigation() {
         NavHost(
             navController = navController,
             startDestination = "tab_host",
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            // 全局页面切换动画：右滑入 + 淡入
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { it / 3 },
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(300))
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { -it / 5 },
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(250))
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { -it / 5 },
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(300))
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { it / 3 },
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(250))
+            }
         ) {
         // Invisible placeholder — tabs are rendered above
         composable("tab_host") {}
@@ -938,12 +1198,7 @@ fun AppNavigation() {
             )
         }
 
-        // Theme设置
-        composable(Routes.THEME_SETTINGS) {
-            ThemeSettingsScreen(
-                onBack = { navController.popBackStack() }
-            )
-        }
+
         
         // 浏览器内核设置
         composable(Routes.BROWSER_KERNEL) {

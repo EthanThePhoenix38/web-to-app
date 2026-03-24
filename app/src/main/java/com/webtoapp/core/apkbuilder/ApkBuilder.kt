@@ -491,6 +491,28 @@ class ApkBuilder(private val context: Context) {
                 optimizedApk.delete()
             }
             
+            // === ZipAlign: 确保 resources.arsc 4-byte 对齐 (Android R+ 强制要求) ===
+            logger.section("ZipAlign")
+            try {
+                val preAlignCheck = ZipAligner.verifyAlignment(unsignedApk)
+                logger.logKeyValue("preAlignCheck", if (preAlignCheck) "已对齐" else "未对齐")
+                
+                if (!preAlignCheck) {
+                    val alignSuccess = ZipAligner.alignInPlace(unsignedApk)
+                    logger.logKeyValue("zipAlignResult", if (alignSuccess) "对齐成功" else "对齐失败")
+                    
+                    if (alignSuccess) {
+                        val postAlignCheck = ZipAligner.verifyAlignment(unsignedApk)
+                        logger.logKeyValue("postAlignVerify", if (postAlignCheck) "验证通过" else "验证失败")
+                    }
+                } else {
+                    logger.log("resources.arsc 已正确对齐，跳过 ZipAlign")
+                }
+            } catch (e: Exception) {
+                logger.warn("ZipAlign error (non-fatal): ${e.message}")
+                AppLogger.w("ApkBuilder", "ZipAlign failed (non-fatal)", e)
+            }
+            
             onProgress(75, "Signing APK...")
             logger.section("Sign APK")
             

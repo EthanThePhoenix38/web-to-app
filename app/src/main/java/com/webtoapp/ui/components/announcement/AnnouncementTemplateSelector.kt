@@ -1,7 +1,7 @@
 package com.webtoapp.ui.components.announcement
 
-import com.webtoapp.ui.components.PremiumSwitch
 import com.webtoapp.ui.components.PremiumOutlinedButton
+import com.webtoapp.ui.components.PremiumSwitch
 import com.webtoapp.ui.components.PremiumFilterChip
 
 import androidx.compose.animation.animateColorAsState

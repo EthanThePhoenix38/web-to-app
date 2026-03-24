@@ -37,7 +37,7 @@ import com.webtoapp.ui.components.EnhancedElevatedCard
 fun MoreScreen(
     onOpenAiCoding: () -> Unit = {},
     onOpenAiSettings: () -> Unit = {},
-    onOpenThemeSettings: () -> Unit = {},
+
     onOpenBrowserKernel: () -> Unit = {},
     onOpenHostsAdBlock: () -> Unit = {},
     onOpenAppModifier: () -> Unit = {},
@@ -66,18 +66,14 @@ fun MoreScreen(
             )
         }
     ) { padding ->
-        ThemedBackgroundBox(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
                 // ── AI 工具 ──
                 MoreSectionTitle(Strings.moreSectionAiTools)
                 MoreMenuCard {
@@ -138,14 +134,9 @@ fun MoreScreen(
                     )
                 }
 
-                // ── 外观 & 数据 ──
+                // ── 数据 & 统计 ──
                 MoreSectionTitle(Strings.moreSectionAppearance)
                 MoreMenuCard {
-                    MoreMenuItem(
-                        title = Strings.menuThemeSettings,
-                        icon = painterResource(R.drawable.ic_sidebar_theme),
-                        onClick = onOpenThemeSettings
-                    )
                     MoreMenuItem(
                         title = Strings.menuStats,
                         icon = painterResource(R.drawable.ic_sidebar_stats),
@@ -163,7 +154,6 @@ fun MoreScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-            }
         }
     }
 }

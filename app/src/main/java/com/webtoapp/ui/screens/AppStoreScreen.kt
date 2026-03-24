@@ -279,30 +279,26 @@ fun AppStoreScreen(
             }
         }
     ) { padding ->
-        ThemedBackgroundBox(
+        HorizontalPager(
+            state = pagerState,
+            beyondViewportPageCount = 1,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-        ) {
-            HorizontalPager(
-                state = pagerState,
-                beyondViewportPageCount = 1,
-                modifier = Modifier.fillMaxSize()
-            ) { page ->
-                when (page) {
-                    0 -> AppsTabContent(
-                        apiClient = apiClient,
-                        searchQuery = searchQuery,
-                        isSearchActive = isSearchActive,
-                        downloadManager = downloadManager
-                    )
-                    1 -> ModulesTabContent(
-                        cloudViewModel = cloudViewModel,
-                        searchQuery = searchQuery,
-                        isSearchActive = isSearchActive,
-                        onInstallModule = onInstallModule
-                    )
-                }
+        ) { page ->
+            when (page) {
+                0 -> AppsTabContent(
+                    apiClient = apiClient,
+                    searchQuery = searchQuery,
+                    isSearchActive = isSearchActive,
+                    downloadManager = downloadManager
+                )
+                1 -> ModulesTabContent(
+                    cloudViewModel = cloudViewModel,
+                    searchQuery = searchQuery,
+                    isSearchActive = isSearchActive,
+                    onInstallModule = onInstallModule
+                )
             }
         }
     }
@@ -985,11 +981,22 @@ private fun ModuleStoreDetailSheet(
         sheetState = sheetState,
         modifier = Modifier.fillMaxHeight(0.92f),
         containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = { WindowInsets(0) },
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            snackbarHost = {
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.padding(16.dp)
+                )
+            },
+            modifier = Modifier.fillMaxSize()
+        ) { scaffoldPadding ->
         LazyColumn(
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxSize().padding(scaffoldPadding),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             // ── Header ──
@@ -1102,8 +1109,7 @@ private fun ModuleStoreDetailSheet(
             }
             item { Spacer(modifier = Modifier.height(32.dp)) }
         }
-        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp))
-        }
+        } // Scaffold
     }
 
     // Report dialog
@@ -1685,11 +1691,22 @@ private fun AppDetailSheet(
         sheetState = sheetState,
         modifier = Modifier.fillMaxHeight(0.92f),
         containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = { WindowInsets(0) },
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            snackbarHost = {
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.padding(16.dp)
+                )
+            },
+            modifier = Modifier.fillMaxSize()
+        ) { scaffoldPadding ->
         LazyColumn(
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxSize().padding(scaffoldPadding),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // ── Header with gradient hero ──
@@ -2355,13 +2372,9 @@ private fun AppDetailSheet(
                 GlassDivider(Modifier.padding(start = 62.dp))
             }
 
-            item { Spacer(modifier = Modifier.height(32.dp)) }
+            item { Spacer(modifier = Modifier.height(8.dp)) }
         }
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
-        )
-        } // Box
+        } // Scaffold
     }
 
     // Report dialog
@@ -2861,6 +2874,7 @@ private fun DownloadManagerSheet(
         sheetState = sheetState,
         modifier = Modifier.fillMaxHeight(0.85f),
         containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = { WindowInsets(0) },
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
@@ -4339,6 +4353,7 @@ private fun MyAppsSheet(
         sheetState = sheetState,
         modifier = Modifier.fillMaxHeight(0.92f),
         containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = { WindowInsets(0) },
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
@@ -4570,6 +4585,7 @@ private fun AppManagementSheet(
         sheetState = sheetState,
         modifier = Modifier.fillMaxHeight(0.95f),
         containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = { WindowInsets(0) },
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -5521,6 +5537,7 @@ private fun PublishAppSheet(
         sheetState = sheetState,
         modifier = Modifier.fillMaxHeight(0.92f),
         containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = { WindowInsets(0) },
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Scaffold(
@@ -7085,6 +7102,7 @@ private fun MyModulesSheet(
         sheetState = sheetState,
         modifier = Modifier.fillMaxHeight(0.92f),
         containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = { WindowInsets(0) },
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
@@ -7519,6 +7537,7 @@ private fun PublishModuleSheet(
         sheetState = sheetState,
         modifier = Modifier.fillMaxHeight(0.92f),
         containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = { WindowInsets(0) },
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Scaffold(

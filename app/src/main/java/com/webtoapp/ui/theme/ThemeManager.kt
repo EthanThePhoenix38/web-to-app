@@ -31,7 +31,6 @@ class ThemeManager(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     
     companion object {
-        private val KEY_THEME_TYPE = stringPreferencesKey("theme_type")
         private val KEY_DARK_MODE = stringPreferencesKey("dark_mode")
         private val KEY_ENABLE_ANIMATIONS = booleanPreferencesKey("enable_animations")
         private val KEY_ENABLE_PARTICLES = booleanPreferencesKey("enable_particles")
@@ -85,20 +84,9 @@ class ThemeManager(private val context: Context) {
     // 使用 StateFlow 而非 Flow，确保在重组时保持最新状态
     
     /**
-     * 当前主题类型 StateFlow
+     * 当前主题类型 StateFlow（固定为默认主题）
      */
-    val themeTypeFlow: StateFlow<AppThemeType> = context.themeDataStore.data.map { prefs ->
-        val typeName = prefs[KEY_THEME_TYPE] ?: AppThemeType.KIMI_NO_NAWA.name
-        try {
-            AppThemeType.valueOf(typeName)
-        } catch (e: Exception) {
-            AppThemeType.KIMI_NO_NAWA
-        }
-    }.stateIn(
-        scope = scope,
-        started = SharingStarted.Eagerly,
-        initialValue = AppThemeType.KIMI_NO_NAWA
-    )
+    val themeTypeFlow: StateFlow<AppThemeType> = kotlinx.coroutines.flow.MutableStateFlow(AppThemeType.KIMI_NO_NAWA)
     
     /**
      * 暗色模式设置 StateFlow
@@ -179,12 +167,10 @@ class ThemeManager(private val context: Context) {
     // ==================== 设置方法 ====================
     
     /**
-     * 设置主题类型
+     * 设置主题类型（已禁用，固定使用默认主题）
      */
     suspend fun setThemeType(type: AppThemeType) {
-        context.themeDataStore.edit { prefs ->
-            prefs[KEY_THEME_TYPE] = type.name
-        }
+        // 已移除主题切换功能
     }
     
     /**

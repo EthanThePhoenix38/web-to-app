@@ -929,6 +929,11 @@ object Strings {
         AppLanguage.ENGLISH -> "Please select at least one tag"
         AppLanguage.ARABIC -> "يرجى اختيار علامة واحدة على الأقل"
     }
+    val communityTagMaxLimit: String get() = when (lang) {
+        AppLanguage.CHINESE -> "最多只能选择 3 个标签"
+        AppLanguage.ENGLISH -> "You can select up to 3 tags"
+        AppLanguage.ARABIC -> "يمكنك اختيار 3 علامات كحد أقصى"
+    }
     val communityLoginToPost: String get() = when (lang) {
         AppLanguage.CHINESE -> "请先登录后再发帖"
         AppLanguage.ENGLISH -> "Please sign in to create a post"
@@ -991,6 +996,11 @@ object Strings {
         AppLanguage.CHINESE -> "粉丝"
         AppLanguage.ENGLISH -> "Followers"
         AppLanguage.ARABIC -> "متابِعون"
+    }
+    val communityApps: String get() = when (lang) {
+        AppLanguage.CHINESE -> "应用"
+        AppLanguage.ENGLISH -> "Apps"
+        AppLanguage.ARABIC -> "التطبيقات"
     }
     val communityModules: String get() = when (lang) {
         AppLanguage.CHINESE -> "模块"
@@ -5531,6 +5541,18 @@ object Strings {
         AppLanguage.CHINESE -> "检查更新失败"
         AppLanguage.ENGLISH -> "Check update failed"
         AppLanguage.ARABIC -> "فشل التحقق من التحديثات"
+    }
+
+    val autoCheckUpdate: String get() = when (lang) {
+        AppLanguage.CHINESE -> "自动检查更新"
+        AppLanguage.ENGLISH -> "Auto Check Updates"
+        AppLanguage.ARABIC -> "التحقق التلقائي من التحديثات"
+    }
+
+    val autoCheckUpdateDesc: String get() = when (lang) {
+        AppLanguage.CHINESE -> "启动时自动检测新版本"
+        AppLanguage.ENGLISH -> "Automatically check for new versions on launch"
+        AppLanguage.ARABIC -> "التحقق تلقائيًا من الإصدارات الجديدة عند التشغيل"
     }
 
     // ==================== AI 状态 ====================

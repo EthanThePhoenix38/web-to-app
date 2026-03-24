@@ -2,6 +2,7 @@ package com.webtoapp.util
 
 import android.app.DownloadManager
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
@@ -46,6 +47,12 @@ object AppUpdateChecker {
     // Cache配置
     private const val CACHE_TTL_MS = 30 * 60 * 1000L // 30分钟
     
+    // 自动检查更新 偏好设置
+    private const val PREFS_NAME = "app_update_prefs"
+    private const val KEY_AUTO_CHECK_UPDATE = "auto_check_update"
+    private const val KEY_LAST_AUTO_CHECK_TIME = "last_auto_check_time"
+    private const val AUTO_CHECK_COOLDOWN_MS = 6 * 60 * 60 * 1000L // 6小时冷却
+    
     // Pre-compiled regex for fallback version extraction
     private val VERSION_REGEX = Regex("""releases/(?:tag|download)/v?(\d+\.\d+\.\d+)""")
     
@@ -54,6 +61,38 @@ object AppUpdateChecker {
     private var cacheTimestamp: Long = 0
     
     private val client get() = NetworkModule.defaultClient
+    
+    private fun getPrefs(context: Context): SharedPreferences =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    
+    /**
+     * 获取自动检查更新开关状态（默认开启）
+     */
+    fun isAutoCheckEnabled(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_AUTO_CHECK_UPDATE, true)
+    
+    /**
+     * 设置自动检查更新开关
+     */
+    fun setAutoCheckEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_AUTO_CHECK_UPDATE, enabled).apply()
+    }
+    
+    /**
+     * 检查是否需要自动检查更新（冷却时间内不重复检查）
+     */
+    fun shouldAutoCheck(context: Context): Boolean {
+        if (!isAutoCheckEnabled(context)) return false
+        val lastCheck = getPrefs(context).getLong(KEY_LAST_AUTO_CHECK_TIME, 0L)
+        return System.currentTimeMillis() - lastCheck > AUTO_CHECK_COOLDOWN_MS
+    }
+    
+    /**
+     * 记录自动检查时间
+     */
+    fun recordAutoCheck(context: Context) {
+        getPrefs(context).edit().putLong(KEY_LAST_AUTO_CHECK_TIME, System.currentTimeMillis()).apply()
+    }
     
     /**
      * 版本更新信息

@@ -946,6 +946,19 @@ class JarSigner(private val context: Context) {
                 }
             }
             
+            // V1 签名重建了整个 ZIP，需要重新对齐 resources.arsc
+            // 这是修复 Android R+ "-124: Failed parse" 错误的关键步骤
+            try {
+                val aligned = ZipAligner.alignInPlace(outputApk)
+                if (aligned) {
+                    AppLogger.d(TAG, "V1 签名后 ZipAlign 成功")
+                } else {
+                    AppLogger.w(TAG, "V1 签名后 ZipAlign 失败 (非致命)")
+                }
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "V1 签名后 ZipAlign 异常 (非致命): ${e.message}")
+            }
+            
             val verified = verifyApkDetailed(outputApk, "V1")
             
             // 即使验证失败，如果文件存在且有内容，仍返回 true

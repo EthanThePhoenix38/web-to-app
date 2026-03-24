@@ -253,6 +253,7 @@ fun UserProfileScreen(
                                                 showFollowersSheet = true
                                             }
                                         )
+                                        StatLabel(user.appCount, Strings.communityApps)
                                         StatLabel(user.moduleCount, Strings.communityModules)
                                     }
                                 }

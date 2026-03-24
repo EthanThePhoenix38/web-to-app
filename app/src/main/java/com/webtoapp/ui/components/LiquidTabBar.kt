@@ -103,7 +103,12 @@ fun LiquidTabBar(
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val outlineVariant = MaterialTheme.colorScheme.outlineVariant
 
-    Box(modifier = modifier.fillMaxWidth().height(barHeight)) {
+    Box(modifier = modifier
+        .fillMaxWidth()
+        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
+        .navigationBarsPadding()
+        .height(barHeight)
+    ) {
 
         // ── 毛玻璃背景 ──
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

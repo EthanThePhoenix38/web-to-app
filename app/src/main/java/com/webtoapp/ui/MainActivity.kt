@@ -15,6 +15,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -26,7 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -38,7 +39,10 @@ import com.webtoapp.core.logging.AppLogger
 import com.webtoapp.ui.components.FirstLaunchLanguageScreen
 import com.webtoapp.ui.navigation.AppNavigation
 import com.webtoapp.ui.shell.ShellActivity
+import com.webtoapp.ui.theme.CircularRevealOverlay
+import com.webtoapp.ui.theme.LocalThemeRevealState
 import com.webtoapp.ui.theme.WebToAppTheme
+import com.webtoapp.ui.theme.rememberThemeRevealState
 
 /**
  * 主Activity - 应用入口
@@ -113,6 +117,9 @@ class MainActivity : ComponentActivity() {
         }
         
         setContent {
+            // 圆形揭示动画状态（在主题之外创建，以便截图包含当前主题）
+            val themeRevealState = rememberThemeRevealState()
+            
             WebToAppTheme { isDarkTheme ->
                 // 根据主题设置状态栏颜色（跟随主题色）
                 val themeColors = MaterialTheme.colorScheme
@@ -132,20 +139,29 @@ class MainActivity : ComponentActivity() {
                 val languageManager = remember { LanguageManager.getInstance(context) }
                 val hasSelectedLanguage by languageManager.hasSelectedLanguageFlow.collectAsState(initial = true)
                 
-                // 首次启动显示语言选择，否则显示主内容
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                // 提供 ThemeRevealState 给子组件（HomeScreen 的切换按钮）
+                CompositionLocalProvider(
+                    LocalThemeRevealState provides themeRevealState
                 ) {
-                    if (!hasSelectedLanguage && showLanguageSelection) {
-                        FirstLaunchLanguageScreen(
-                            onLanguageSelected = {
-                                showLanguageSelection = false
-                            }
-                        )
-                    } else {
+                    Box(modifier = Modifier.fillMaxSize()) {
                         // 主内容
-                        AppNavigation()
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.background
+                        ) {
+                            if (!hasSelectedLanguage && showLanguageSelection) {
+                                FirstLaunchLanguageScreen(
+                                    onLanguageSelected = {
+                                        showLanguageSelection = false
+                                    }
+                                )
+                            } else {
+                                AppNavigation()
+                            }
+                        }
+                        
+                        // 圆形揭示动画叠层（在所有内容之上）
+                        CircularRevealOverlay(revealState = themeRevealState)
                     }
                 }
                 

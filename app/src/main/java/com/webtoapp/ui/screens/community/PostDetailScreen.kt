@@ -51,7 +51,7 @@ import org.koin.compose.koinInject
  * 帖子详情页 — Premium Twitter/X Style
  * 完整功能：帖子内容、媒体展示、应用链接、交互栏（物理弹簧）、评论列表、回复评论
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PostDetailScreen(
     postId: Int,
@@ -290,8 +290,11 @@ fun PostDetailScreen(
                                     // ── Tags ──
                                     if (p.tags.isNotEmpty()) {
                                         Spacer(Modifier.height(14.dp))
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            p.tags.take(6).forEach { tag ->
+                                        FlowRow(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            p.tags.forEach { tag ->
                                                 Surface(
                                                     shape = RoundedCornerShape(6.dp),
                                                     color = tagColor(tag).copy(alpha = 0.12f)
@@ -430,12 +433,12 @@ fun PostDetailScreen(
                                 Row(
                                     Modifier.fillMaxWidth()
                                         .padding(horizontal = 16.dp, vertical = 10.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(20.dp)
+                                    horizontalArrangement = Arrangement.SpaceEvenly
                                 ) {
                                     StatPill("${p.likeCount}", Strings.communityLike)
                                     StatPill("${p.commentCount}", Strings.communityComment)
                                     StatPill("${p.shareCount}", Strings.communityShare)
-                                    StatPill("${p.viewCount}", "")
+                                    StatPill("${p.viewCount}", Strings.favorite)
                                 }
                             }
                             GlassDivider()
@@ -451,6 +454,7 @@ fun PostDetailScreen(
                                     DetailActionButton(
                                         icon = Icons.Outlined.FavoriteBorder,
                                         activeIcon = Icons.Filled.Favorite,
+                                        label = Strings.communityLike,
                                         isActive = p.isLiked,
                                         activeColor = Color(0xFFE91E63),
                                         onClick = {
@@ -470,6 +474,7 @@ fun PostDetailScreen(
                                     DetailActionButton(
                                         icon = Icons.Outlined.ChatBubbleOutline,
                                         activeIcon = Icons.Outlined.ChatBubbleOutline,
+                                        label = Strings.communityComment,
                                         isActive = false,
                                         activeColor = MaterialTheme.colorScheme.primary,
                                         onClick = { /* Focus comment input */ }
@@ -477,6 +482,7 @@ fun PostDetailScreen(
                                     DetailActionButton(
                                         icon = Icons.Outlined.Repeat,
                                         activeIcon = Icons.Filled.Repeat,
+                                        label = Strings.communityShare,
                                         isActive = false,
                                         activeColor = Color(0xFF4CAF50),
                                         onClick = {
@@ -493,6 +499,7 @@ fun PostDetailScreen(
                                     DetailActionButton(
                                         icon = Icons.Outlined.BookmarkBorder,
                                         activeIcon = Icons.Filled.Bookmark,
+                                        label = Strings.favorite,
                                         isActive = false,
                                         activeColor = MaterialTheme.colorScheme.primary,
                                         onClick = {
@@ -640,12 +647,14 @@ fun PostDetailScreen(
 
 @Composable
 private fun StatPill(count: String, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(count, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        if (label.isNotEmpty()) {
-            Spacer(Modifier.width(3.dp))
-            Text(label, fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(count, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            if (label.isNotEmpty()) {
+                Spacer(Modifier.width(3.dp))
+                Text(label, fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+            }
         }
     }
 }
@@ -657,6 +666,7 @@ private fun StatPill(count: String, label: String) {
 @Composable
 private fun DetailActionButton(
     icon: ImageVector, activeIcon: ImageVector,
+    label: String = "",
     isActive: Boolean, activeColor: Color,
     onClick: () -> Unit
 ) {
@@ -677,24 +687,34 @@ private fun DetailActionButton(
     var showBurst by remember { mutableStateOf(false) }
     var burstKey by remember { mutableIntStateOf(0) }
 
-    Box(contentAlignment = Alignment.Center) {
-        LikeBurstEffect(
-            trigger = showBurst,
-            color = activeColor,
-            modifier = Modifier.size(36.dp)
-        )
-
-        IconButton(
-            onClick = {
-                bouncing = true
-                if (!isActive) { showBurst = true; burstKey++ }
-                onClick()
-            },
-            modifier = Modifier.size(42.dp)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null
         ) {
+            bouncing = true
+            if (!isActive) { showBurst = true; burstKey++ }
+            onClick()
+        }
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            LikeBurstEffect(
+                trigger = showBurst,
+                color = activeColor,
+                modifier = Modifier.size(36.dp)
+            )
             Icon(
                 if (isActive) activeIcon else icon, null,
                 Modifier.size(22.dp).scale(scale), tint = currentColor
+            )
+        }
+        if (label.isNotEmpty()) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                label, fontSize = 11.sp,
+                color = currentColor,
+                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal
             )
         }
     }

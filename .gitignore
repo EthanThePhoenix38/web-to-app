@@ -99,3 +99,6 @@ node_modules/
 # Python
 __pycache__/
 *.pyc
+
+# Project docs (local only)
+skills.md

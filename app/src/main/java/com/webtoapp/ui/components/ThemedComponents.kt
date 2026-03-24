@@ -3,7 +3,6 @@ package com.webtoapp.ui.components
 import android.os.Build
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -24,17 +23,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil.ImageLoader
-import coil.compose.AsyncImage
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
-import coil.request.ImageRequest
-import coil.size.Size
 import com.webtoapp.ui.theme.*
 import androidx.compose.animation.core.Spring
 
@@ -46,81 +38,26 @@ import androidx.compose.animation.core.Spring
 // ==================== 主题化背景修饰符 ====================
 
 /**
- * 为 Modifier 添加主题背景
- * 对于静态壁纸使用 painterResource
- * 对于 GIF 动态壁纸，请使用 ThemedBackgroundBox composable
- * 没有壁纸时使用渐变
+ * 为 Modifier 添加主题纯色背景
  */
 @Composable
 fun Modifier.themedBackground(): Modifier {
     val theme = LocalAppTheme.current
     val isDark = LocalIsDarkTheme.current
 
-    // 壁纸由 ThemedBackgroundBox 渲染（支持任意图片格式）
-    // Modifier 版本只处理渐变背景
-    if (theme.wallpaperResId != 0 || theme.animatedWallpaperResId != 0) {
-        // 有壁纸时使用纯色底色（壁纸由 ThemedBackgroundBox 叠加）
-        return if (isDark) {
-            val bgColor = theme.gradients.background.firstOrNull() ?: Color(0xFF0C0A14)
-            this.drawBehind { drawRect(color = bgColor) }
-        } else {
-            this.drawBehind { drawRect(color = Color(0xFFF5F1F8)) }
-        }
+    val bgColor = if (isDark) {
+        theme.darkColors.background
+    } else {
+        theme.lightColors.background
     }
 
-    // 没有壁纸时使用渐变背景
-    return if (isDark) {
-        val bgColors = theme.gradients.background.ifEmpty {
-            listOf(Color(0xFF0C0A14), Color(0xFF1A1030), Color(0xFF261840))
-        }
-        this.drawBehind {
-            drawRect(
-                brush = Brush.verticalGradient(bgColors),
-                size = size
-            )
-        }
-    } else {
-        val primary = theme.lightColors.primary
-        val secondary = theme.lightColors.secondary
-        val tertiary = theme.lightColors.tertiary
-        this.drawBehind {
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        primary.copy(alpha = 0.15f).compositeOver(Color(0xFFF2EDF6)),
-                        Color(0xFFF5F1F8),
-                        tertiary.copy(alpha = 0.10f).compositeOver(Color(0xFFF4F0F5))
-                    )
-                ),
-                size = size
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        primary.copy(alpha = 0.12f),
-                        Color.Transparent
-                    )
-                ),
-                radius = size.width * 0.6f,
-                center = Offset(size.width * 0.15f, size.height * 0.08f)
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        secondary.copy(alpha = 0.08f),
-                        Color.Transparent
-                    )
-                ),
-                radius = size.width * 0.5f,
-                center = Offset(size.width * 0.85f, size.height * 0.7f)
-            )
-        }
+    return this.drawBehind {
+        drawRect(color = bgColor)
     }
 }
 
 /**
- * 主题背景容器 — 支持所有壁纸格式（JPEG、WebP、PNG、GIF）
- * 通过 Coil 加载壁纸，自动识别图片格式，不依赖文件扩展名
+ * 主题背景容器 — 使用渐变背景
  *
  * 用法：
  * ```
@@ -134,103 +71,7 @@ fun ThemedBackgroundBox(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val theme = LocalAppTheme.current
-    val isDark = LocalIsDarkTheme.current
-    val context = LocalContext.current
-
-    // 获取屏幕像素尺寸，确保壁纸以高清分辨率加载
-    val displayMetrics = context.resources.displayMetrics
-    val screenWidthPx = displayMetrics.widthPixels
-    val screenHeightPx = displayMetrics.heightPixels
-
-    // 构建支持 GIF 的 ImageLoader（也能自动处理 JPEG/WebP/PNG）
-    val imageLoader = remember(context) {
-        ImageLoader.Builder(context)
-            .components {
-                if (Build.VERSION.SDK_INT >= 28) {
-                    add(ImageDecoderDecoder.Factory())
-                } else {
-                    add(GifDecoder.Factory())
-                }
-            }
-            .allowHardware(false)  // 禁用硬件位图，避免大图被裁切
-            .build()
-    }
-
-    // 决定用哪个壁纸资源：优先动态壁纸（GIF），其次静态壁纸
-    val wallpaperResId = when {
-        theme.animatedWallpaperResId != 0 -> theme.animatedWallpaperResId
-        theme.wallpaperResId != 0 -> theme.wallpaperResId
-        else -> 0
-    }
-
-
     Box(modifier = modifier.themedBackground()) {
-        // 通过 Coil 渲染壁纸（支持所有格式）
-        if (wallpaperResId != 0) {
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(wallpaperResId)
-                    .size(screenWidthPx, screenHeightPx)  // 按屏幕像素尺寸加载
-                    .allowHardware(false)
-                    .crossfade(300)
-                    .build(),
-                contentDescription = null,
-                imageLoader = imageLoader,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-
-            // ===== 柔和过渡遮罩层 =====
-            // 多档位渐变：顶部透明 → 中部微透 → 底部半透明
-            // 营造壁纸与内容之间平滑的高斯模糊式视觉过渡
-            val surfaceColor = if (isDark) {
-                Color.Black
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
-            val baseAlpha = if (isDark) 0.35f else 0.15f
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0.00f to surfaceColor.copy(alpha = baseAlpha * 0.3f),
-                                0.15f to surfaceColor.copy(alpha = baseAlpha * 0.5f),
-                                0.35f to surfaceColor.copy(alpha = baseAlpha * 0.85f),
-                                0.55f to surfaceColor.copy(alpha = baseAlpha * 1.2f),
-                                0.75f to surfaceColor.copy(alpha = baseAlpha * 1.6f),
-                                1.00f to surfaceColor.copy(alpha = (baseAlpha * 2.2f).coerceAtMost(0.88f))
-                            )
-                        )
-                    )
-            )
-
-            // 额外径向光晕：在顶部中心添加柔和的高光
-            if (!isDark) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .drawBehind {
-                            drawCircle(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(
-                                        Color.White.copy(alpha = 0.72f),
-                                        Color.Transparent
-                                    ),
-                                    center = Offset(size.width * 0.5f, size.height * 0.08f),
-                                    radius = size.width * 0.8f
-                                ),
-                                center = Offset(size.width * 0.5f, size.height * 0.08f),
-                                radius = size.width * 0.8f
-                            )
-                        }
-                )
-            }
-        }
-
         content()
     }
 }

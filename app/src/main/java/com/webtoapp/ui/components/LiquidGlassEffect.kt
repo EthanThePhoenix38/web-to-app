@@ -55,10 +55,6 @@ fun Modifier.liquidGlass(
     else
         Color.White.copy(alpha = 0.78f)       // 亮色：高不透明度磨砂玻璃
 
-    val highlightColor = if (isDark)
-        Color.White.copy(alpha = 0.10f)
-    else
-        Color.White.copy(alpha = 0.35f)
 
     val borderColor = if (isDark)
         Color.White.copy(alpha = borderAlpha * 0.5f)
@@ -83,27 +79,7 @@ fun Modifier.liquidGlass(
         .clip(shape)
         // 2. 半透明填充（不用 blur！Compose 的 blur 会模糊内容本身）
         .background(fillColor, shape)
-        // 3. 顶部高光：模拟玻璃曲面的光线折射
-        .then(
-            if (enableHighlight) {
-                Modifier.drawWithContent {
-                    drawContent()
-                    drawRoundRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                highlightColor,
-                                Color.Transparent
-                            ),
-                            startY = 0f,
-                            endY = size.height * 0.40f
-                        ),
-                        cornerRadius = CornerRadius(cornerRadius.toPx()),
-                        size = size
-                    )
-                }
-            } else Modifier
-        )
-        // 4. 极细边框
+        // 3. 极细边框
         .border(
             width = 0.5.dp,
             color = borderColor,

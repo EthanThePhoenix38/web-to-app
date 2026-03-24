@@ -363,6 +363,68 @@ fun AboutScreen(
                     }
                 }
                 
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // ========== 自动检查更新开关 ==========
+                var autoCheckEnabled by remember {
+                    mutableStateOf(AppUpdateChecker.isAutoCheckEnabled(context))
+                }
+                EnhancedElevatedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF4CAF50).copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Autorenew,
+                                    null,
+                                    tint = Color(0xFF4CAF50),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    Strings.autoCheckUpdate,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    Strings.autoCheckUpdateDesc,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Switch(
+                            checked = autoCheckEnabled,
+                            onCheckedChange = { enabled ->
+                                autoCheckEnabled = enabled
+                                AppUpdateChecker.setAutoCheckEnabled(context, enabled)
+                            }
+                        )
+                    }
+                }
+                
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 // ========== 数据备份卡片 ==========

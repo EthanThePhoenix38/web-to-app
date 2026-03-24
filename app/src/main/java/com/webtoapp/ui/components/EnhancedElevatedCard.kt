@@ -50,21 +50,16 @@ fun EnhancedElevatedCard(
 
     // macOS 玻璃填充色 — 半透明，让底层背景隐约透过
     val glassFill = containerColor ?: if (isDark)
-        Color.White.copy(alpha = 0.12f)
+        Color.White.copy(alpha = 0.08f)
     else
-        Color.White.copy(alpha = 0.78f)
+        Color.White.copy(alpha = 0.85f)
 
     // 极细边框 — macOS 玻璃面板的标志性特征
     val borderColor = if (isDark)
-        Color.White.copy(alpha = 0.12f)
-    else
-        Color.Black.copy(alpha = 0.06f)
-
-    // 顶部内侧高光 — 模拟光线照射到玻璃曲面
-    val highlightColor = if (isDark)
         Color.White.copy(alpha = 0.08f)
     else
-        Color.White.copy(alpha = 0.30f)
+        Color.Black.copy(alpha = 0.05f)
+
 
     // 柔和阴影色
     val shadowColor = if (isDark)
@@ -84,19 +79,7 @@ fun EnhancedElevatedCard(
             .clip(RoundedCornerShape(cornerRadius))
             // 2. 半透明填充 — 核心！
             .background(glassFill, RoundedCornerShape(cornerRadius))
-            // 3. 顶部高光渐变
-            .drawWithContent {
-                drawContent()
-                drawRoundRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(highlightColor, Color.Transparent),
-                        startY = 0f,
-                        endY = size.height * 0.4f
-                    ),
-                    cornerRadius = CornerRadius(cornerRadius.toPx())
-                )
-            }
-            // 4. 极细边框
+            // 3. 极细边框
             .border(0.5.dp, borderColor, RoundedCornerShape(cornerRadius)),
         shape = RoundedCornerShape(cornerRadius),
         color = Color.Transparent,       // 关键：Surface 本身不上色
@@ -142,21 +125,16 @@ fun EnhancedElevatedCard(
 
     // 玻璃填充色
     val glassFill = containerColor ?: if (isDark)
-        Color.White.copy(alpha = 0.12f)
+        Color.White.copy(alpha = 0.08f)
     else
-        Color.White.copy(alpha = 0.78f)
+        Color.White.copy(alpha = 0.85f)
 
     // 边框 — 按压时略微加亮
     val borderColor = if (isDark)
-        Color.White.copy(alpha = if (isPressed) 0.20f else 0.12f)
+        Color.White.copy(alpha = if (isPressed) 0.15f else 0.08f)
     else
-        Color.Black.copy(alpha = if (isPressed) 0.10f else 0.06f)
+        Color.Black.copy(alpha = if (isPressed) 0.08f else 0.05f)
 
-    // 顶部高光
-    val highlightColor = if (isDark)
-        Color.White.copy(alpha = 0.08f)
-    else
-        Color.White.copy(alpha = 0.30f)
 
     // 阴影
     val shadowColor = if (isDark)
@@ -182,18 +160,6 @@ fun EnhancedElevatedCard(
             .clip(RoundedCornerShape(cornerRadius))
             // 半透明填充
             .background(glassFill, RoundedCornerShape(cornerRadius))
-            // 顶部高光
-            .drawWithContent {
-                drawContent()
-                drawRoundRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(highlightColor, Color.Transparent),
-                        startY = 0f,
-                        endY = size.height * 0.4f
-                    ),
-                    cornerRadius = CornerRadius(cornerRadius.toPx())
-                )
-            }
             // 极细边框
             .border(0.5.dp, borderColor, RoundedCornerShape(cornerRadius)),
         enabled = enabled,

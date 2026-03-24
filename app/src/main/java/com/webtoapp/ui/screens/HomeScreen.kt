@@ -3,14 +3,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.webtoapp.ui.components.PremiumButton
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +23,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Announcement
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,7 +58,12 @@ import com.webtoapp.ui.components.ThemedBackgroundBox
 import com.webtoapp.ui.components.MoveToCategoryDialog
 import com.webtoapp.ui.theme.LocalAnimationSettings
 import com.webtoapp.ui.theme.AppColors
+import com.webtoapp.ui.theme.ThemeManager
 import com.webtoapp.ui.theme.LocalAppTheme
+import com.webtoapp.ui.theme.LocalThemeRevealState
+import com.webtoapp.ui.animation.StaggeredAnimatedItem
+import com.webtoapp.ui.animation.breathingFloat
+import com.webtoapp.ui.animation.AnimatedAlertDialog
 import com.webtoapp.ui.viewmodel.MainViewModel
 import com.webtoapp.ui.viewmodel.UiState
 import kotlinx.coroutines.Dispatchers
@@ -65,8 +76,16 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
@@ -261,6 +280,72 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    // 深/浅色模式切换按钮（带圆形揭示动画）
+                    val context = LocalContext.current
+                    val themeManager = remember { ThemeManager.getInstance(context) }
+                    val darkModeState by themeManager.darkModeFlow.collectAsStateWithLifecycle()
+                    val isDarkNow = darkModeState == ThemeManager.DarkModeSettings.DARK
+                    
+                    // 获取圆形揭示动画状态
+                    val revealState = LocalThemeRevealState.current
+                    val view = LocalView.current
+                    val activity = context as? android.app.Activity
+                    
+                    // 记录按钮在屏幕上的中心坐标
+                    var buttonCenter by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+                    
+                    IconButton(
+                        onClick = {
+                            val switchToDark = !isDarkNow
+                            
+                            if (revealState != null) {
+                                // ★ 可打断：不再检查 isAnimating
+                                // 如果动画进行中，triggerReveal 会自动取消旧动画、重新截图、重新开始
+                                revealState.triggerReveal(
+                                    center = buttonCenter,
+                                    switchToDark = switchToDark,
+                                    view = view,
+                                    window = activity?.window
+                                ) {
+                                    // 截图完成后切换主题
+                                    scope.launch {
+                                        val newMode = if (switchToDark) {
+                                            ThemeManager.DarkModeSettings.DARK
+                                        } else {
+                                            ThemeManager.DarkModeSettings.LIGHT
+                                        }
+                                        themeManager.setDarkMode(newMode)
+                                    }
+                                }
+                            } else {
+                                // Fallback: 无动画直接切换
+                                scope.launch {
+                                    val newMode = if (switchToDark) {
+                                        ThemeManager.DarkModeSettings.DARK
+                                    } else {
+                                        ThemeManager.DarkModeSettings.LIGHT
+                                    }
+                                    themeManager.setDarkMode(newMode)
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .onGloballyPositioned { coords ->
+                                val bounds = coords.boundsInRoot()
+                                buttonCenter = androidx.compose.ui.geometry.Offset(
+                                    bounds.left + bounds.width / 2,
+                                    bounds.top + bounds.height / 2
+                                )
+                            }
+                    ) {
+                        Icon(
+                            imageVector = if (isDarkNow) Icons.Outlined.DarkMode else Icons.Outlined.LightMode,
+                            contentDescription = if (isDarkNow) "Dark" else "Light",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    
                     // 语言选择按钮
                     LanguageSelectorButton(
                         onLanguageChanged = {
@@ -295,16 +380,45 @@ fun HomeScreen(
             )
         },
 
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                // 弹簧滑入动画
+                var isVisible by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { isVisible = true }
+                
+                val offsetY by animateFloatAsState(
+                    targetValue = if (isVisible) 0f else 100f,
+                    animationSpec = spring(
+                        dampingRatio = 0.65f,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "snackbarSlide"
+                )
+                val alpha by animateFloatAsState(
+                    targetValue = if (isVisible) 1f else 0f,
+                    animationSpec = spring(
+                        dampingRatio = 0.85f,
+                        stiffness = Spring.StiffnessMedium
+                    ),
+                    label = "snackbarAlpha"
+                )
+                
+                Snackbar(
+                    snackbarData = data,
+                    modifier = Modifier.graphicsLayer {
+                        translationY = offsetY * density
+                        this.alpha = alpha
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        }
     ) { padding ->
-        ThemedBackgroundBox(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
-            ) {
             // 分类标签栏
             CategoryTabRow(
                 categories = categories,
@@ -445,10 +559,60 @@ fun HomeScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(apps, key = { it.id }) { app ->
+                    itemsIndexed(apps, key = { _, app -> app.id }) { index, app ->
                         val exporter = sharedExporter
                         val scope = sharedScope
                         val previewSpec = previewSpecs[app.id] ?: AppPreviewSpec()
+
+                        // 交错入场动画
+                        StaggeredAnimatedItem(index = index) {
+                        
+                        // 滑动删除
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { value ->
+                                if (value == SwipeToDismissBoxValue.EndToStart) {
+                                    selectedApp = app
+                                    showDeleteDialog = true
+                                    false  // 不真正移除，让对话框确认
+                                } else false
+                            }
+                        )
+                        
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            backgroundContent = {
+                                // 删除背景
+                                val dismissProgress = dismissState.progress
+                                val bgAlpha by animateFloatAsState(
+                                    targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart) 1f else 0f,
+                                    label = "dismissBgAlpha"
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(
+                                            MaterialTheme.colorScheme.error.copy(alpha = 0.15f * bgAlpha)
+                                        )
+                                        .padding(end = 24.dp),
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.DeleteOutline,
+                                        contentDescription = Strings.btnDelete,
+                                        tint = MaterialTheme.colorScheme.error.copy(alpha = bgAlpha),
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .graphicsLayer {
+                                                scaleX = 0.7f + 0.3f * bgAlpha
+                                                scaleY = 0.7f + 0.3f * bgAlpha
+                                            }
+                                    )
+                                }
+                            },
+                            enableDismissFromStartToEnd = false,
+                            enableDismissFromEndToStart = true
+                        ) {
 
                         AppCard(
                             app = app,
@@ -586,6 +750,8 @@ fun HomeScreen(
                             } else null,
                             modifier = Modifier.animateItemPlacement()
                         )
+                        } // SwipeToDismissBox
+                        } // StaggeredAnimatedItem
                     }
 
                     // 底部间距
@@ -605,8 +771,30 @@ fun HomeScreen(
                         // Expanded create menu
                         AnimatedVisibility(
                             visible = showFabMenu,
-                            enter = fadeIn(),
-                            exit = fadeOut()
+                            enter = expandVertically(
+                                animationSpec = spring(
+                                    dampingRatio = 0.75f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                ),
+                                expandFrom = Alignment.Bottom
+                            ) + fadeIn(
+                                animationSpec = spring(
+                                    dampingRatio = 0.85f,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            ),
+                            exit = shrinkVertically(
+                                animationSpec = spring(
+                                    dampingRatio = 0.85f,
+                                    stiffness = Spring.StiffnessMedium
+                                ),
+                                shrinkTowards = Alignment.Bottom
+                            ) + fadeOut(
+                                animationSpec = spring(
+                                    dampingRatio = 0.85f,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            )
                         ) {
                             Surface(
                                 modifier = Modifier
@@ -662,6 +850,15 @@ fun HomeScreen(
                         }
 
                         // Main create button
+                        val fabRotation by animateFloatAsState(
+                            targetValue = if (showFabMenu) 135f else 0f,
+                            animationSpec = spring(
+                                dampingRatio = 0.6f,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            label = "fabRotation"
+                        )
+                        
                         FilledTonalButton(
                             onClick = { showFabMenu = !showFabMenu },
                             modifier = Modifier
@@ -674,9 +871,11 @@ fun HomeScreen(
                             )
                         ) {
                             Icon(
-                                if (showFabMenu) Icons.Default.Close else Icons.Default.Add,
+                                Icons.Default.Add,
                                 Strings.btnCreate,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .graphicsLayer { rotationZ = fabRotation }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
@@ -686,7 +885,6 @@ fun HomeScreen(
                         }
                     }
             } // Column
-        } // ThemedBackgroundBox
     }
 
     // Build APK 对话框
@@ -709,7 +907,7 @@ fun HomeScreen(
 
     // Delete确认对话框
     if (showDeleteDialog && selectedApp != null) {
-        AlertDialog(
+        AnimatedAlertDialog(
             onDismissRequest = {
                 showDeleteDialog = false
                 selectedApp = null
@@ -1389,7 +1587,9 @@ fun EmptyState(
         Icon(
             imageVector = Icons.Outlined.AppShortcut,
             contentDescription = null,
-            modifier = Modifier.size(80.dp),
+            modifier = Modifier
+                .size(80.dp)
+                .breathingFloat(),
             tint = MaterialTheme.colorScheme.outline
         )
         Spacer(modifier = Modifier.height(16.dp))
@@ -1463,7 +1663,7 @@ fun BuildApkDialog(
         engineFileManager.isEngineDownloaded(com.webtoapp.core.engine.EngineType.GECKOVIEW)
     }
 
-    AlertDialog(
+    AnimatedAlertDialog(
         onDismissRequest = { if (!isBuilding) onDismiss() },
         title = { Text(Strings.buildDialogTitle) },
         text = {
@@ -1563,17 +1763,66 @@ fun BuildApkDialog(
 
                 // 进度
                 if (isBuilding) {
-                    Spacer(Modifier.height(8.dp))
-                    LinearProgressIndicator(
-                        progress = { progress / 100f },
-                        modifier = Modifier.fillMaxWidth()
+                    Spacer(Modifier.height(12.dp))
+                    
+                    // 动画进度环
+                    val animatedProgress by animateFloatAsState(
+                        targetValue = progress / 100f,
+                        animationSpec = spring(
+                            dampingRatio = 0.8f,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        label = "buildProgress"
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "$progressText ($progress%)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    
+                    // 脉冲发光
+                    var pulseAlpha by remember { mutableFloatStateOf(0.6f) }
+                    LaunchedEffect(Unit) {
+                        while (true) {
+                            delay(1000)
+                            pulseAlpha = if (pulseAlpha > 0.8f) 0.6f else 1f
+                        }
+                    }
+                    val animPulse by animateFloatAsState(
+                        targetValue = pulseAlpha,
+                        animationSpec = tween(800),
+                        label = "pulseAlpha"
                     )
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // 圆形进度
+                        Box(contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(
+                                progress = { animatedProgress },
+                                modifier = Modifier.size(48.dp),
+                                strokeWidth = 4.dp,
+                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = animPulse)
+                            )
+                            Text(
+                                "${progress}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                progressText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            LinearProgressIndicator(
+                                progress = { animatedProgress },
+                                modifier = Modifier.fillMaxWidth(),
+                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                            )
+                        }
+                    }
                 }
                 
                 // APK 分析报告

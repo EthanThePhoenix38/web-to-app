@@ -16,6 +16,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.*
@@ -702,7 +703,13 @@ fun AiCodingScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        if (showDrawer) {
+                            showDrawer = false
+                        } else {
+                            onBack()
+                        }
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, Strings.back)
                     }
                 },
@@ -719,8 +726,8 @@ fun AiCodingScreen(
                     IconButton(onClick = { showConfigSheet = true }) {
                         Icon(Icons.Outlined.Settings, Strings.settings)
                     }
-                    // 侧边栏
-                    IconButton(onClick = { showDrawer = true }) {
+                    // 侧边栏（切换开关）
+                    IconButton(onClick = { showDrawer = !showDrawer }) {
                         Icon(Icons.Default.Menu, Strings.sessionList)
                     }
                 }
@@ -899,30 +906,45 @@ fun AiCodingScreen(
     
     // 侧边抽屉 - 会话列表
     if (showDrawer) {
-        ModalDrawerSheet(
-            modifier = Modifier.width(280.dp)
+        // 半透明遮罩，点击关闭
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f))
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
+                    showDrawer = false
+                }
+        )
+        // 从右侧滑入的会话面板
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.CenterEnd
         ) {
-            AiCodingSessionDrawerContent(
-                sessions = sessions,
-                currentSessionId = currentSessionId,
-                selectedCodingType = selectedCodingType,
-                onSessionClick = { sessionId ->
-                    scope.launch {
-                        storage.setCurrentSession(sessionId)
-                        showDrawer = false
-                    }
-                },
-                onDeleteSession = { sessionId ->
-                    scope.launch {
-                        storage.deleteSession(sessionId)
-                    }
-                },
-                onNewSession = { createNewSession() },
-                onCodingTypeChange = { type ->
-                    selectedCodingType = type
-                },
-                onDismiss = { showDrawer = false }
-            )
+            ModalDrawerSheet(
+                modifier = Modifier.width(280.dp)
+            ) {
+                AiCodingSessionDrawerContent(
+                    sessions = sessions,
+                    currentSessionId = currentSessionId,
+                    selectedCodingType = selectedCodingType,
+                    onSessionClick = { sessionId ->
+                        scope.launch {
+                            storage.setCurrentSession(sessionId)
+                            showDrawer = false
+                        }
+                    },
+                    onDeleteSession = { sessionId ->
+                        scope.launch {
+                            storage.deleteSession(sessionId)
+                        }
+                    },
+                    onNewSession = { createNewSession() },
+                    onCodingTypeChange = { type ->
+                        selectedCodingType = type
+                    },
+                    onDismiss = { showDrawer = false }
+                )
+            }
         }
     }
     

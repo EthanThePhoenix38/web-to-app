@@ -13,6 +13,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.*
@@ -705,7 +706,13 @@ fun AiHtmlCodingScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        if (showDrawer) {
+                            showDrawer = false
+                        } else {
+                            onBack()
+                        }
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, Strings.back)
                     }
                 },
@@ -726,8 +733,8 @@ fun AiHtmlCodingScreen(
                     IconButton(onClick = { showConfigSheet = true }) {
                         Icon(Icons.Outlined.Settings, Strings.settings)
                     }
-                    // 侧边栏
-                    IconButton(onClick = { showDrawer = true }) {
+                    // 侧边栏（切换开关）
+                    IconButton(onClick = { showDrawer = !showDrawer }) {
                         Icon(Icons.Default.Menu, Strings.sessionList)
                     }
                 }
@@ -878,26 +885,41 @@ fun AiHtmlCodingScreen(
     
     // 侧边抽屉 - 会话列表
     if (showDrawer) {
-        ModalDrawerSheet(
-            modifier = Modifier.width(280.dp)
+        // 半透明遮罩，点击关闭
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f))
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
+                    showDrawer = false
+                }
+        )
+        // 从右侧滑入的会话面板
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.CenterEnd
         ) {
-            SessionDrawerContent(
-                sessions = sessions,
-                currentSessionId = currentSessionId,
-                onSessionClick = { sessionId ->
-                    scope.launch {
-                        storage.setCurrentSession(sessionId)
-                        showDrawer = false
-                    }
-                },
-                onDeleteSession = { sessionId ->
-                    scope.launch {
-                        storage.deleteSession(sessionId)
-                    }
-                },
-                onNewSession = { createNewSession() },
-                onDismiss = { showDrawer = false }
-            )
+            ModalDrawerSheet(
+                modifier = Modifier.width(280.dp)
+            ) {
+                SessionDrawerContent(
+                    sessions = sessions,
+                    currentSessionId = currentSessionId,
+                    onSessionClick = { sessionId ->
+                        scope.launch {
+                            storage.setCurrentSession(sessionId)
+                            showDrawer = false
+                        }
+                    },
+                    onDeleteSession = { sessionId ->
+                        scope.launch {
+                            storage.deleteSession(sessionId)
+                        }
+                    },
+                    onNewSession = { createNewSession() },
+                    onDismiss = { showDrawer = false }
+                )
+            }
         }
     }
     

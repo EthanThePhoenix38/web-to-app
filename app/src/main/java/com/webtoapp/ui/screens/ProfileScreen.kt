@@ -133,13 +133,9 @@ fun ProfileScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        ThemedBackgroundBox(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
         Column(
             modifier = Modifier.fillMaxSize()
+                .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -517,7 +513,6 @@ fun ProfileScreen(
             )
         }
     }
-        }
 }
 
 // ─── 修改密码对话框 ───

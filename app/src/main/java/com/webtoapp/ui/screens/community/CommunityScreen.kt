@@ -173,10 +173,9 @@ fun CommunityScreen(
             }
         }
     ) { padding ->
-        ThemedBackgroundBox(
+        Column(
             modifier = Modifier.fillMaxSize().padding(padding)
         ) {
-            Column {
                 // ─── Tag Filter Bar ───
                 LazyRow(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -272,7 +271,6 @@ fun CommunityScreen(
                         }
                     }
                 }
-            }
         }
     }
 
@@ -730,20 +728,49 @@ private fun CreatePostSheet(
             Spacer(Modifier.height(12.dp))
 
             // Tags
-            Text(Strings.communitySelectTags, style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val maxTags = 3
+            Text(
+                "${Strings.communitySelectTags} (${selectedTags.size}/$maxTags)",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (selectedTags.size >= maxTags)
+                    MaterialTheme.colorScheme.tertiary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(Modifier.height(6.dp))
             Column {
                 availableTags.chunked(5).forEach { row ->
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         items(row) { tag ->
+                            val isSelected = tag in selectedTags
+                            val isDisabled = !isSelected && selectedTags.size >= maxTags
                             FilterChip(
-                                selected = tag in selectedTags,
-                                onClick = { selectedTags = if (tag in selectedTags) selectedTags - tag else selectedTags + tag },
-                                label = { Text(tag, fontSize = 11.sp) },
-                                modifier = Modifier.height(28.dp), shape = RoundedCornerShape(8.dp),
-                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = tagColor(tag).copy(alpha = 0.15f), selectedLabelColor = tagColor(tag)),
-                                leadingIcon = if (tag in selectedTags) { { Icon(Icons.Filled.Check, null, Modifier.size(12.dp)) } } else null
+                                selected = isSelected,
+                                onClick = {
+                                    if (isSelected) {
+                                        selectedTags = selectedTags - tag
+                                    } else if (selectedTags.size < maxTags) {
+                                        selectedTags = selectedTags + tag
+                                    } else {
+                                        scope.launch { snackbarHostState.showSnackbar(Strings.communityTagMaxLimit) }
+                                    }
+                                },
+                                label = {
+                                    Text(tag, fontSize = 11.sp,
+                                        color = if (isDisabled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                        else Color.Unspecified)
+                                },
+                                modifier = Modifier.height(28.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                enabled = !isDisabled,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = tagColor(tag).copy(alpha = 0.15f),
+                                    selectedLabelColor = tagColor(tag),
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                ),
+                                leadingIcon = if (isSelected) { { Icon(Icons.Filled.Check, null, Modifier.size(12.dp)) } } else null
                             )
                         }
                     }
@@ -875,12 +902,44 @@ fun tagColor(tag: String): Color = when (tag) {
 fun formatTimeAgo(isoString: String?): String {
     if (isoString == null) return ""
     return try {
+        // ── 1. Extract timezone offset from ISO string ──
+        // Server may return: "2026-03-24T22:30:15+00:00", "...+08:00", "...Z", or bare
+        val tzRegex = Regex("([+-])(\\d{2}):(\\d{2})$")
+        val tzMatch = tzRegex.find(isoString)
+        val endsWithZ = isoString.endsWith("Z")
+
+        // Calculate the offset in milliseconds
+        val offsetMs = when {
+            tzMatch != null -> {
+                val sign = if (tzMatch.groupValues[1] == "+") 1 else -1
+                val hh = tzMatch.groupValues[2].toInt()
+                val mm = tzMatch.groupValues[3].toInt()
+                sign * (hh * 3600_000L + mm * 60_000L)
+            }
+            endsWithZ -> 0L
+            else -> 0L   // no timezone info → assume UTC (server should always send +00:00)
+        }
+
+        // ── 2. Strip fractional seconds AND timezone suffix ──
+        val cleaned = isoString
+            .replace(Regex("\\.[0-9]+"), "")          // remove .123456
+            .replace(Regex("[+-]\\d{2}:\\d{2}$"), "")  // remove +08:00
+            .replace(Regex("Z$"), "")                  // remove trailing Z
+
+        // ── 3. Parse as local-of-offset, then convert to epoch millis ──
         val format = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US).apply {
             timeZone = java.util.TimeZone.getTimeZone("UTC")
+            isLenient = false
         }
-        val date = format.parse(isoString) ?: return isoString
+        val parsed = format.parse(cleaned) ?: return isoString
+        // parsed.time = epoch millis assuming the string is UTC.
+        // Subtract the offset to get the actual UTC epoch millis.
+        val epochMs = parsed.time - offsetMs
+
+        // ── 4. Relative time ──
         val now = System.currentTimeMillis()
-        val diff = now - date.time
+        val diff = now - epochMs
+        if (diff < 0) return Strings.timeJustNow // future time safety
         val minutes = diff / 60000
         val hours = minutes / 60
         val days = hours / 24

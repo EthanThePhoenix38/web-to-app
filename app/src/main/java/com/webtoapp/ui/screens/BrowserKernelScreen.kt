@@ -1,5 +1,6 @@
 package com.webtoapp.ui.screens
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.webtoapp.ui.components.PremiumSwitch
 import com.webtoapp.ui.components.PremiumOutlinedButton
 
 import android.content.Context
@@ -25,7 +26,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.webtoapp.ui.components.EnhancedElevatedCard
-import com.webtoapp.ui.components.PremiumSwitch
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
